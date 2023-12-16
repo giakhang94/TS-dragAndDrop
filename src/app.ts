@@ -1,57 +1,52 @@
 //drag and drop project
 //validate decorator
-interface ValidateObject {
-  [props: string]: {
-    [validateProp: string]: string[];
-  };
+//code theo ông thầy
+interface Validatable {
+  value: string | number;
+  required?: boolean;
+  minLength?: number;
+  maxLength?: number;
+  min?: number; //question mark allow undefined value
+  max?: number;
 }
-const validateObject: ValidateObject = {};
-function Requireds(target: any, propname: string) {
-  //target.constructor.name equal to the name of the class contain the property
-  if (!validateObject[target.constructor.name]) {
-    validateObject[target.constructor.name] = {
-      ...validateObject[target.constructor.name],
-      [propname]: ["required"],
-    };
-  } else {
-    if (!validateObject[target.constructor.name][propname]) {
-      validateObject[target.constructor.name][propname] = [];
-    }
-    validateObject[target.constructor.name][propname].push("required");
+function validator(validateInput: Validatable) {
+  let isValid = true;
+  if (validateInput.required) {
+    isValid = isValid && validateInput.value.toString().trim().length > 0;
   }
-}
-function PositiveNumber(target: any, propname: string) {
-  if (!validateObject[target.constructor.name]) {
-    validateObject[target.constructor.name] = {
-      ...validateObject[target.constructor.name],
-      [propname]: ["positive"],
-    };
-  } else {
-    if (!validateObject[target.constructor.name][propname]) {
-      validateObject[target.constructor.name][propname] = [];
-    }
-    validateObject[target.constructor.name][propname].push("positive");
-  }
-}
-function validator(obj: any) {
-  //obj is an instance base on an specific class (exp claas A)
-  //then obj.constructor.name is equal to A (name of the base class)
-  console.log(validateObject);
-  let result = true;
-  for (const prop in validateObject[obj.constructor.name]) {
-    // for(const validateProp of validateObject)
-    for (const validateProp of validateObject[obj.constructor.name][prop]) {
-      console.log(prop + " " + validateProp);
-      switch (validateProp) {
-        case "required":
-          result = result && obj[prop].length !== 0;
-          break;
-        case "positive":
-          result = result && +obj[prop] > 0;
-      }
+  if (validateInput.minLength) {
+    if (typeof validateInput.value === "number") {
+      isValid = isValid && true;
+    } else {
+      isValid =
+        isValid &&
+        validateInput.value.toString().trim().length >= validateInput.minLength;
     }
   }
-  return result;
+  if (validateInput.maxLength) {
+    if (typeof validateInput.value === "number") {
+      isValid = isValid && true;
+    } else {
+      isValid =
+        isValid &&
+        validateInput.value.toString().trim().length <= validateInput.maxLength;
+    }
+  }
+  if (validateInput.max) {
+    if (typeof validateInput.value !== "number") {
+      console.log("can apply maximum value for NaN value");
+    } else {
+      isValid = isValid && validateInput.value <= validateInput.max;
+    }
+  }
+  if (validateInput.min) {
+    if (typeof validateInput.value !== "number") {
+      console.log("can apply minimum value for NaN value");
+    } else {
+      isValid = isValid && validateInput.value >= validateInput.min;
+    }
+  }
+  return isValid;
 }
 //auto bind dercorator
 function AutoBind(
@@ -72,23 +67,105 @@ function AutoBind(
   };
   return newDescriptor;
 }
+//project list class
+class ProjectList {
+  templateElement: HTMLTemplateElement;
+  hostElement: HTMLDivElement;
+  element: HTMLElement;
+  assignedProjects: Project[] = [];
+  constructor(private type: "active" | "finished") {
+    this.templateElement = document.getElementById(
+      "project-list"
+    ) as HTMLTemplateElement;
+    this.hostElement = document.getElementById("app") as HTMLDivElement;
+    this.assignedProjects = [];
+    const importNode = document.importNode(this.templateElement.content, true);
+    this.element = importNode.firstElementChild as HTMLElement;
+    this.element.id = `${this.type}-projects`;
 
-//done for decorators
-//class for validate input value
-class User {
-  @Requireds
-  title: string;
-  @Requireds
-  description: string;
-  @PositiveNumber
-  @Requireds
-  people: number;
-  constructor(t: string, dsc: string, pp: number) {
-    this.title = t;
-    this.description = dsc;
-    this.people = pp;
+    projectState.addListener((projects: any[]) => {
+      console.log("re-render console.log", projects);
+      // console.log("this", this); //refer to ProjectList class
+      this.assignedProjects = projects;
+      this.renderProjects();
+    });
+
+    this.attach();
+    this.renderContent();
+  }
+  private renderProjects() {
+    const listEl = document.getElementById(
+      `${this.type}-projects-list`
+    )! as HTMLUListElement;
+    for (const prjItem of this.assignedProjects) {
+      const listItem = document.createElement("li");
+      listItem.textContent = prjItem.title;
+      listEl?.appendChild(listItem);
+    }
+  }
+  private renderContent() {
+    const listId = `${this.type}-projects-list`;
+    this.element.querySelector("ul")!.id = listId;
+    this.element.querySelector("h2")!.textContent =
+      this.type.toUpperCase() + " PROJECTS";
+  }
+  private attach() {
+    this.hostElement.insertAdjacentElement("beforeend", this.element);
   }
 }
+
+//Project Type
+enum ProjectStatus {
+  active,
+  finished,
+}
+class Project {
+  constructor(
+    public id: string,
+    public title: string,
+    public description: string,
+    public people: number,
+    public status: ProjectStatus
+  ) {}
+}
+//listner type
+type Listener = (items: Project[]) => void;
+//Project state management
+class ProjectState {
+  private listeners: Listener[] = []; //a list of funtions that wiLl be called when something changes
+  private projects: Project[] = [];
+  static instance: ProjectState;
+  private constructor() {}
+  static getInstance() {
+    if (this.instance) {
+      return this.instance;
+    }
+    this.instance = new ProjectState();
+    return this.instance;
+  }
+  addProject(title: string, description: string, numOfPeople: number) {
+    const newProject = new Project(
+      Math.random().toString(),
+      title,
+      description,
+      numOfPeople,
+      ProjectStatus.active
+    );
+
+    this.projects.push(newProject);
+    for (const listenFn of this.listeners) {
+      // console.log(this.projects.slice());
+      listenFn(this.projects.slice());
+    }
+  }
+  addListener(listenerFn: Listener) {
+    console.log("listenerFn", listenerFn);
+    this.listeners.push(listenerFn);
+  }
+}
+
+//global projectState
+const projectState = ProjectState.getInstance();
 //class for input porject
 class ProjectInput {
   templateElement: HTMLTemplateElement;
@@ -129,7 +206,12 @@ class ProjectInput {
     //'this' of submithandler refer to to form element which triggers the sumbmit function
     event.preventDefault();
     const userInput = this.gatherUserInput();
-    console.log(userInput);
+    if (Array.isArray(userInput)) {
+      const [title, description, people] = userInput;
+      // console.log(title, description, people); it works
+      projectState.addProject(title, description, people);
+      this.clearInputs();
+    }
   }
   private clearInputs() {
     this.titleInputElement.value = "";
@@ -149,16 +231,26 @@ class ProjectInput {
     const titleValue = this.titleInputElement.value;
     const descriptionValue = this.descriptionInputElement.value;
     const peopleValue = +this.peopleInputElement.value;
-    let user1 = new User(titleValue, descriptionValue, peopleValue);
-    console.log(validator(user1));
-    if (validator(user1)) {
-      this.clearInputs();
-      return [titleValue, descriptionValue, peopleValue];
+    let validateTitle = { value: titleValue, required: true, minLength: 5 };
+    let validateDescription = {
+      value: descriptionValue,
+      required: true,
+      minLength: 5,
+    };
+    let validatePeople = { value: peopleValue, required: true, min: 2, max: 9 };
+    if (
+      !validator(validateDescription) ||
+      !validator(validatePeople) ||
+      !validator(validateTitle)
+    ) {
+      alert("invalid input value(s), please try again");
     } else {
-      alert("invalid value, please try again");
-      return;
+      console.log([titleValue, descriptionValue, peopleValue]);
+      return [titleValue, descriptionValue, peopleValue];
     }
   }
 }
 
 const prjInput = new ProjectInput();
+const prjListActive = new ProjectList("active");
+const prjListFinished = new ProjectList("finished");
