@@ -80,7 +80,7 @@ abstract class Component<T extends HTMLElement, U extends HTMLElement> {
     newElementId?: string
   ) {
     this.templateElement = document.getElementById(
-      "project-list"
+      templateId
     ) as HTMLTemplateElement;
     this.hostElement = document.getElementById(hostElementId) as T;
 
@@ -93,6 +93,8 @@ abstract class Component<T extends HTMLElement, U extends HTMLElement> {
   }
   abstract configure(): void;
   abstract renderContent(): void;
+  //pause here at 8:00 in the section 131 - adding Inheritance and Generics
+
   private attach(insertAtBeginning: boolean) {
     this.hostElement.insertAdjacentElement(
       insertAtBeginning ? "afterbegin" : "beforeend",
@@ -102,34 +104,12 @@ abstract class Component<T extends HTMLElement, U extends HTMLElement> {
 }
 
 //project list class
-class ProjectList {
-  templateElement: HTMLTemplateElement;
-  hostElement: HTMLDivElement;
-  element: HTMLElement;
+class ProjectList extends Component<HTMLDivElement, HTMLElement> {
   assignedProjects: Project[] = [];
   constructor(private type: ProjectStatus) {
-    this.templateElement = document.getElementById(
-      "project-list"
-    ) as HTMLTemplateElement;
-    this.hostElement = document.getElementById("app") as HTMLDivElement;
+    super("project-list", "app", false, `${type}-projects`);
     this.assignedProjects = [];
-    const importNode = document.importNode(this.templateElement.content, true);
-    this.element = importNode.firstElementChild as HTMLElement;
-    this.element.id = `${this.type}-projects`;
-
-    projectState.addListener((projects: any[]) => {
-      console.log("re-render console.log", projects);
-      // console.log("this", this); //refer to ProjectList class
-      const releativeProjects = projects.filter((project: Project) => {
-        if (this.type === ProjectStatus.Active) {
-          return project.status === ProjectStatus.Active;
-        }
-        return project.status === ProjectStatus.Finished;
-      });
-      this.assignedProjects = releativeProjects;
-      this.renderProjects();
-    });
-    this.attach();
+    this.configure();
     this.renderContent();
   }
   private renderProjects() {
@@ -143,14 +123,27 @@ class ProjectList {
       listEl?.appendChild(listItem);
     }
   }
-  private renderContent() {
+
+  configure(): void {
+    projectState.addListener((projects: any[]) => {
+      console.log("re-render console.log", projects);
+      // console.log("this", this); //refer to ProjectList class
+      const releativeProjects = projects.filter((project: Project) => {
+        if (this.type === ProjectStatus.Active) {
+          return project.status === ProjectStatus.Active;
+        }
+        return project.status === ProjectStatus.Finished;
+      });
+      this.assignedProjects = releativeProjects;
+      this.renderProjects();
+    });
+  }
+
+  renderContent() {
     const listId = `${this.type}-projects-list`;
     this.element.querySelector("ul")!.id = listId;
     this.element.querySelector("h2")!.textContent =
       this.type.toUpperCase() + " PROJECTS";
-  }
-  private attach() {
-    this.hostElement.insertAdjacentElement("beforeend", this.element);
   }
 }
 
@@ -169,13 +162,22 @@ class Project {
   ) {}
 }
 //listner type
-type Listener = (items: Project[]) => void;
+type Listener<T> = (items: T[]) => void;
+
+class State<T> {
+  protected listeners: Listener<T>[] = [];
+  addListenr(lisenterFn: Listener<T>) {
+    this.listeners.push(lisenterFn);
+  }
+}
 //Project state management
-class ProjectState {
-  private listeners: Listener[] = []; //a list of funtions that wiLl be called when something changes
+class ProjectState extends State<Project> {
+  // private listeners: Listener[] = []; //a list of funtions that wiLl be called when something changes
   private projects: Project[] = [];
   static instance: ProjectState;
-  private constructor() {}
+  private constructor() {
+    super();
+  }
   static getInstance() {
     if (this.instance) {
       return this.instance;
@@ -198,7 +200,7 @@ class ProjectState {
       listenFn(this.projects.slice());
     }
   }
-  addListener(listenerFn: Listener) {
+  addListener(listenerFn: Listener<Project>) {
     console.log("listenerFn", listenerFn);
     this.listeners.push(listenerFn);
   }
@@ -207,24 +209,12 @@ class ProjectState {
 //global projectState
 const projectState = ProjectState.getInstance();
 //class for input porject
-class ProjectInput {
-  templateElement: HTMLTemplateElement;
-  hostElement: HTMLDivElement;
-  element: HTMLFormElement;
+class ProjectInput extends Component<HTMLDivElement, HTMLFormElement> {
   titleInputElement: HTMLInputElement;
   descriptionInputElement: HTMLInputElement;
   peopleInputElement: HTMLInputElement;
   constructor() {
-    this.templateElement = <HTMLTemplateElement>(
-      document.getElementById("project-input")!
-    );
-    this.hostElement = document.getElementById("app")! as HTMLDivElement;
-
-    const importNode = document.importNode(this.templateElement.content, true);
-    //this.templateElement.contet => get the content in order to the first argument is a Fragment Document (no parent element)
-
-    this.element = importNode.firstElementChild as HTMLFormElement;
-    this.element.id = "user-input";
+    super("project-input", "app", true, "user-input");
     this.titleInputElement = this.element.querySelector(
       "#title"
     ) as HTMLInputElement;
@@ -236,7 +226,6 @@ class ProjectInput {
     ) as HTMLInputElement;
 
     this.configure();
-    this.attach();
   }
   //method for listner
   @AutoBind
@@ -259,14 +248,12 @@ class ProjectInput {
     this.peopleInputElement.value = "0";
   }
   //add a listener for the form
-  private configure() {
+  configure() {
     //'this' keyword of configure() method refer to the ProjectInput class
     // console.log("configure this", this);
     this.element.addEventListener("submit", this.submitHanlder);
   }
-  private attach() {
-    this.hostElement.insertAdjacentElement("afterbegin", this.element);
-  }
+  renderContent(): void {}
   private gatherUserInput(): [string, string, number] | void {
     const titleValue = this.titleInputElement.value;
     const descriptionValue = this.descriptionInputElement.value;
