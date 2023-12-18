@@ -67,13 +67,47 @@ function AutoBind(
   };
   return newDescriptor;
 }
+
+//Component Base Class
+abstract class Component<T extends HTMLElement, U extends HTMLElement> {
+  templateElement: HTMLTemplateElement;
+  hostElement: T;
+  element: U;
+  constructor(
+    templateId: string,
+    hostElementId: string,
+    insertAtStart: boolean,
+    newElementId?: string
+  ) {
+    this.templateElement = document.getElementById(
+      "project-list"
+    ) as HTMLTemplateElement;
+    this.hostElement = document.getElementById(hostElementId) as T;
+
+    const importNode = document.importNode(this.templateElement.content, true);
+    this.element = importNode.firstElementChild as U;
+    if (newElementId) {
+      this.element.id = newElementId;
+    }
+    this.attach(insertAtStart);
+  }
+  abstract configure(): void;
+  abstract renderContent(): void;
+  private attach(insertAtBeginning: boolean) {
+    this.hostElement.insertAdjacentElement(
+      insertAtBeginning ? "afterbegin" : "beforeend",
+      this.element
+    );
+  }
+}
+
 //project list class
 class ProjectList {
   templateElement: HTMLTemplateElement;
   hostElement: HTMLDivElement;
   element: HTMLElement;
   assignedProjects: Project[] = [];
-  constructor(private type: "active" | "finished") {
+  constructor(private type: ProjectStatus) {
     this.templateElement = document.getElementById(
       "project-list"
     ) as HTMLTemplateElement;
@@ -86,10 +120,15 @@ class ProjectList {
     projectState.addListener((projects: any[]) => {
       console.log("re-render console.log", projects);
       // console.log("this", this); //refer to ProjectList class
-      this.assignedProjects = projects;
+      const releativeProjects = projects.filter((project: Project) => {
+        if (this.type === ProjectStatus.Active) {
+          return project.status === ProjectStatus.Active;
+        }
+        return project.status === ProjectStatus.Finished;
+      });
+      this.assignedProjects = releativeProjects;
       this.renderProjects();
     });
-
     this.attach();
     this.renderContent();
   }
@@ -97,6 +136,7 @@ class ProjectList {
     const listEl = document.getElementById(
       `${this.type}-projects-list`
     )! as HTMLUListElement;
+    listEl.innerHTML = "";
     for (const prjItem of this.assignedProjects) {
       const listItem = document.createElement("li");
       listItem.textContent = prjItem.title;
@@ -116,8 +156,8 @@ class ProjectList {
 
 //Project Type
 enum ProjectStatus {
-  active,
-  finished,
+  "Active" = "active",
+  "Finished" = "finished",
 }
 class Project {
   constructor(
@@ -149,7 +189,7 @@ class ProjectState {
       title,
       description,
       numOfPeople,
-      ProjectStatus.active
+      ProjectStatus.Active
     );
 
     this.projects.push(newProject);
@@ -252,5 +292,5 @@ class ProjectInput {
 }
 
 const prjInput = new ProjectInput();
-const prjListActive = new ProjectList("active");
-const prjListFinished = new ProjectList("finished");
+const prjListActive = new ProjectList(ProjectStatus.Active);
+const prjListFinished = new ProjectList(ProjectStatus.Finished);
