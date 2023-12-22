@@ -91,6 +91,7 @@ button:active {
   box-shadow: 1px 1px 8px rgba(0, 0, 0, 0.26);
   padding: 1rem;
   margin: 1rem;
+  background: #fff;
 }
 
 .projects li h2 {
@@ -112,11 +113,11 @@ button:active {
 }
 
 .droppable {
-  background: #ffe3ee;
+  background: #d6a6c6;
 }
 
 #finished-projects .droppable {
-  background: #d6e1ff;
+  background: #9db2eb;
 }
 
 #user-input {
@@ -124,4 +125,7 @@ button:active {
   padding: 1rem;
   border: 1px solid #ff0062;
   background: #f7f7f7;
+}
+.projects li {
+  list-style-type: none;
 }
